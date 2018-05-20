@@ -11,17 +11,57 @@ class SRL_TAGS(IntEnum):
     FRAME = 13
 
 class ROLE_TYPE(IntEnum):
-    ROOT_VERB = 0
+    ROOT = 0
     SUBJ = 1
     OBJ = 2
-    CLAUSE = 3
+    # Verb clause shouldn't be added as sub-property
+    VB_CLS = 3
     MOD = 4
+    # Conjunction shouldn't be added as sub-property
     CONJ = 5
     MARK = 6
     AUX = 7
     COMP = 8
     CD = 9
     NEG = 10
+    COMP_PRT = 11
+    # possesive noun
+    NN_POS = 12
+    # an adj clause can be added as property
+    JJ_CLS = 13
+    # for all amod, advmod and nmod as
+    JJ_MOD = 14
+    # noun modifier the actor needs to be properly resolved
+    NN_MOD = 15
+    # personal pronoun, modifier and possessive should be resolved
+    PRP = 16
+    PRP_MOD = 17
+    PRP_POS = 18
+    # preposition
+    IN = 19
+
+
+'''
+Different types of prepositions
+Should take two arguments - (before and after IN).
+This helps determine the relationship between clauses.
+'''
+class In_Type(IntEnum):
+    Before = 0, # before time
+    After = 1, # after time
+    As = While = 2, # parallel same time
+    In = Into = Among = Within = Inside = 3, #subsume relation
+    Across = Behind = Outside = Out = Down = Up = Below =\
+        Above = Beside = Under = Around = Underneath = Along =\
+        Left = Right = North = South = Over= 4, #- spaced direction relation
+    On = Onto = Off = Against = 5, # contact relation
+    Of = From = 6, # reference relation
+    At = By = 7, # location relation
+    Because = 8, # causal relation
+    For = If = 9, # declare cause relation
+    With = 10, #characteristic of frame or some object
+    Through = 11, # usage
+    IGNORE = 12 # add prepositions to ignore here.
 
 class NODE_PROPERTIES(IntEnum):
     SUBJ = 0
@@ -32,17 +72,27 @@ class NODE_PROPERTIES(IntEnum):
     NEG = 5
     ACTION = 6
     LOC = 7
-    LAST = 8 #Always keep LAST at the end
+    POS = 8
+    PRP = 9
+    LAST = 10 #Always keep LAST at the end
 
 LOCATION_WORDS = ['on', 'in', 'above', 'below', 'under', 'top', 'back', 'behind', 'front', 'across', 'onto', 'into']
 
 ROLE_PROPERTY_MAP = {ROLE_TYPE.SUBJ:NODE_PROPERTIES.SUBJ,
                      ROLE_TYPE.OBJ:NODE_PROPERTIES.OBJ,
-                     ROLE_TYPE.MOD:NODE_PROPERTIES.MOD,
+                     ROLE_TYPE.NN_MOD:NODE_PROPERTIES.MOD,
+                     ROLE_TYPE.JJ_MOD:NODE_PROPERTIES.MOD,
+                     ROLE_TYPE.JJ_CLS:NODE_PROPERTIES.MOD,
                      ROLE_TYPE.CD:NODE_PROPERTIES.QTY,
                      ROLE_TYPE.MARK:NODE_PROPERTIES.MARK,
                      ROLE_TYPE.NEG:NODE_PROPERTIES.NEG,
-                     ROLE_TYPE.ROOT_VERB:NODE_PROPERTIES.ACTION}
+                     ROLE_TYPE.VB_CLS:NODE_PROPERTIES.ACTION,
+                     ROLE_TYPE.NN_POS:NODE_PROPERTIES.POS,
+                     # Mapping prepositions
+                     ROLE_TYPE.PRP:NODE_PROPERTIES.PRP,
+                     ROLE_TYPE.PRP_MOD:NODE_PROPERTIES.MOD,
+                     ROLE_TYPE.PRP_POS:NODE_PROPERTIES.POS
+                     }
 
 PREDICATE_PROPERTY_NAME = {NODE_PROPERTIES.SUBJ:"subj",
                            NODE_PROPERTIES.OBJ:"obj",
@@ -51,7 +101,25 @@ PREDICATE_PROPERTY_NAME = {NODE_PROPERTIES.SUBJ:"subj",
                            NODE_PROPERTIES.MARK:"mark",
                            NODE_PROPERTIES.NEG:"negated",
                            NODE_PROPERTIES.ACTION:"action",
-                           NODE_PROPERTIES.LOC:"loc"}
+                           NODE_PROPERTIES.LOC:"loc",
+                           NODE_PROPERTIES.PRP:"prep",
+                           NODE_PROPERTIES.POS:"poss"}
+
+PREPOSITION_CATEGORY_NAME = {
+    In_Type.Before:"Event Before", # before time
+    In_Type.After:"Event After", # after time
+    In_Type.As:"Event Simulatenous",
+    In_Type.In:"Subsume Relation", #subsume relation
+    In_Type.Across:"Spaced Relation", #- spaced direction relation
+    In_Type.On:"Contact Relation", # contact relation
+    In_Type.Of:"Reference Relation", # reference relation
+    In_Type.At:"Location Relation", # location relation
+    In_Type.Because:"Causal Relation", # causal relation
+    In_Type.For:"Declare Relation", # declare cause relation
+    In_Type.With:"Property Relation", #characteristic of frame or some object
+    In_Type.Through:"Usage Relation",
+    In_Type.IGNORE:"Unknown Relation"
+}
 
 class roleObject():
     def __init__(self, annotText):
@@ -65,6 +133,7 @@ class roleObject():
 
         self.frameList = []
         self.roleType = -1
+        self.inType = -1
         self.analyzeRole()
 
     def __hash__(self):
@@ -75,8 +144,8 @@ class roleObject():
         return self.Id == other.Id and self.word == other.word
 
     def analyzeRole(self):
-        if 'ROOT' in self.ud or 'VB' in self.pos and not 'aux' in self.ud:
-            self.roleType = ROLE_TYPE.ROOT_VERB
+        if 'ROOT' in self.ud:
+            self.roleType = ROLE_TYPE.ROOT
         elif 'subj' in self.ud:
             self.roleType = ROLE_TYPE.SUBJ
             if 'pass' in self.ud:
@@ -85,47 +154,103 @@ class roleObject():
             self.roleType = ROLE_TYPE.OBJ
             if 'pass' in self.ud:
                 self.roleType = ROLE_TYPE.SUBJ
-        elif 'xcomp' in self.ud:
-            self.roleType = ROLE_TYPE.SUBJ
+        # elif 'xcomp' in self.ud:
+        #     self.roleType = ROLE_TYPE.SUBJ
         elif 'acl' in self.ud or 'advcl' in self.ud:
-            self.roleType = ROLE_TYPE.CLAUSE
+            if 'VB' in self.pos:
+                self.roleType = ROLE_TYPE.VB_CLS
+            elif 'JJ' in self.pos:
+                self.roleType = ROLE_TYPE.JJ_CLS
         elif 'mod' in self.ud:
-            self.roleType = ROLE_TYPE.MOD
-            if self.ud == "nummod":
+            if 'num' in self.ud:
                 self.roleType = ROLE_TYPE.CD
+            elif 'poss' in self.ud:
+                self.roleType = ROLE_TYPE.NN_POS
+            elif 'JJ' in self.pos:
+                self.roleType = ROLE_TYPE.JJ_MOD
+            elif 'NN' in self.pos:
+                self.roleType = ROLE_TYPE.NN_MOD
         elif 'aux' in self.ud:
             self.roleType = ROLE_TYPE.AUX
-        elif 'conj' in self.ud :
+            # self.analyzeAuxType()
+        elif 'conj' in self.ud:
             self.roleType = ROLE_TYPE.CONJ
         elif 'mark' in self.ud:
             self.roleType = ROLE_TYPE.MARK
-        elif 'compound' in self.ud or 'det' in self.ud or 'cc' in self.ud or 'case' in self.ud:
+        elif 'compound' in self.ud or 'det' in self.ud or 'cc' in self.ud or 'POS' in self.pos:
             self.roleType = ROLE_TYPE.COMP
+            if 'prt' in self.ud or 'POS' in self.pos:
+                self.roleType = ROLE_TYPE.COMP_PRT
         elif 'neg' in self.ud:
             self.roleType = ROLE_TYPE.NEG
+
+        if 'IN' is self.pos:
+            self.analyzeInType()
+
+    def analyzeInType(self):
+        if self.word.lower() == 'before': # before time
+            self.inType = In_Type.Before
+        elif self.word.lower() == 'after': # after time
+            self.inType = In_Type.After # after time
+        elif self.word.lower() in ['as','while']: # parallel same time
+            self.inType = In_Type.As
+        elif self.word.lower() in ['in','into','among','within','inside']:
+            self.inType = In_Type.In
+        elif self.word.lower() in ['across','behind','outside','out',
+            'down','up','below','above','beside', 'under', 'around',
+            'underneath', 'along', 'left', 'right', 'north', 'south']: # spaced direction relation
+            self.inType = In_Type.Across
+        elif self.word.lower() in ['on', 'onto', 'off', 'against']: # contact relation
+            self.inType = In_Type.On
+        elif self.word.lower() in ['of','from']: # reference relation
+            self.inType = In_Type.Of
+        elif self.word.lower() in ['at', 'by']: # location relation
+            self.inType = In_Type.At
+        elif self.word.lower() == 'because': # causal relation
+            self.inType = In_Type.Because
+        elif self.word.lower() in ['for', 'if']: # declarative relation
+            self.inType = In_Type.For
+        elif self.word.lower() == 'with': #characteristic of frame or some object
+            self.inType = In_Type.With
+        elif self.word.lower() == 'through': # usage
+            self.inType = In_Type.Through
+        elif self.word.lower() in ['over']: # append other prepositions to ignore here.
+            self.inType = In_Type.IGNORE
 
 class predicateNode():
     def __init__(self, roleObj):
         self.role = roleObj
         self.depList = []
-        self.properties = [None for x in range(NODE_PROPERTIES.LAST)]
+        self.properties = [[] for x in range(NODE_PROPERTIES.LAST)]
 
     def addDependentPredicates(self,depPredList):
         for pred in depPredList:
             self.depList.append(pred)
 
     def extractPropertiesFromDependentPredicates(self):
+        # return back if the properties were already extracted
+        for x in self.properties:
+            if len(x) >0:
+                return
+
         for predicate in self.depList:
             if not predicate.role.roleType in ROLE_PROPERTY_MAP.keys():
                 continue
             nodePropertyVal = ROLE_PROPERTY_MAP[predicate.role.roleType]
+
             if nodePropertyVal == NODE_PROPERTIES.NEG:
-                self.properties[nodePropertyVal] = "neg"
+                self.properties[nodePropertyVal].append("neg")
             else:
+                # if the current predicate is not a subject or root then a verb in it's dependents can't be ACTION
+                if nodePropertyVal == NODE_PROPERTIES.ACTION and \
+                        not (self.role.roleType == ROLE_TYPE.SUBJ or self.role.roleType == ROLE_TYPE.ROOT):
+                    continue
+
                 for locWrd in LOCATION_WORDS:
                     if locWrd in predicate.role.word.split("_"):
                         nodePropertyVal = NODE_PROPERTIES.LOC
-                self.properties[nodePropertyVal] = predicate.role.word
+                        break
+                self.properties[nodePropertyVal].append(predicate.role.word)
 
     def linkCompoundPredicates(self):
         mergedPredicateList = []
