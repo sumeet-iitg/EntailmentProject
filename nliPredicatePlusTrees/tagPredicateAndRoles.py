@@ -216,10 +216,10 @@ def prettyPrintPredicateTree(predicateTree):
         #     print("-" * 40)
         #     print("Sub Predicate:{} \t Properties:{}".format(subPred.role.word, ",".join([PREDICATE_PROPERTY_NAME[i] + ":" + str(subPred.properties[i]) for i in range(len(subPred.properties)) if not subPred.properties[i] is None ])))
         #     print("-" * 40)
-srlAnnotatedData = "C:\\Users\\Sumeet Singh\\Documents\\Lectures\\11-727\\Project\\path-lstm\\PathLSTM\\snli_1.0_test.spatial.sep.conll"
+srlAnnotatedData = "data\\snli_1.0_test.spatial.sep.conll"
 # depAnnotatedData = "C:\\Users\\Sumeet Singh\\Documents\\Lectures\\11-727\\Project\\path-lstm\\PathLSTM\\adjectiveDebug.txt"
 
-depAnnotatedData = "C:\\Users\\Sumeet Singh\\Documents\\Lectures\\11-727\\Project\\path-lstm\\PathLSTM\\snli_1.0_test.spatial.sep.txt.conll"
+depAnnotatedData = "data\\snli_1.0_test.spatial.sep.txt.conll"
 # srlAnnotatedData = "C:\\Users\\Sumeet Singh\\Documents\\Lectures\\11-727\\Project\\path-lstm\\PathLSTM\\frames.txt"
 # depAnnotatedData = "C:\\Users\\Sumeet Singh\\Documents\\Lectures\\11-727\\Project\\path-lstm\\PathLSTM\\dependency.txt"
 
@@ -232,7 +232,8 @@ with codecs.open(depAnnotatedData, 'r', encoding='utf-8') as depReader:
     roleObjects = []
 
     for line in depReader:
-        if lineId < 2:
+
+        if lineId < 2:# we process sentences pairwise
             if line == '\n' or line == '\r\n':
                 # srlFileRdr.readSentenceAndAddFrame(roleObjects)
                 predicateTree = makePredicateTree(roleObjects)
@@ -243,6 +244,7 @@ with codecs.open(depAnnotatedData, 'r', encoding='utf-8') as depReader:
             else:
                 roleObjects.append(roleObject(line))
         else:
+            # does nothing
             comparePredicateTrees(predicateTreePair[0], predicateTreePair[1])
             predicateTreePairList.append(predicateTreePair)
             roleObjects = [roleObject(line)] #insert the line read
